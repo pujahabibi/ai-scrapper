@@ -48,6 +48,57 @@ function ProgressIndicator({ progress }) {
       </div>
     );
   }
+  
+  // Handle 'analyzing' state with special emphasis
+  if (progress.step === 'analyzing') {
+    return (
+      <div className="d-flex justify-content-center mb-3 slide-in-left">
+        <Card className="bg-light border-0 shadow-sm">
+          <Card.Body className="d-flex align-items-center py-3 px-4">
+            <div className="d-flex me-3">
+              <span className="typing-dot"></span>
+              <span className="typing-dot"></span>
+              <span className="typing-dot"></span>
+            </div>
+            <div>
+              <div className="fw-semibold text-primary mb-1">
+                <i className="fas fa-search me-2"></i>
+                {progress.description || 'Analyzing your request...'}
+              </div>
+              <small className="text-muted">AI is understanding your question...</small>
+            </div>
+          </Card.Body>
+        </Card>
+      </div>
+    );
+  }
+  
+  // Handle 'processing' state with special emphasis (including scraping preparation)
+  if (progress.step === 'processing') {
+    const isScrapingPrep = progress.description && progress.description.includes('scrape');
+    return (
+      <div className="d-flex justify-content-center mb-3 slide-in-left">
+        <Card className="bg-light border-0 shadow-sm">
+          <Card.Body className="d-flex align-items-center py-3 px-4">
+            <div className="d-flex me-3">
+              <span className="typing-dot"></span>
+              <span className="typing-dot"></span>
+              <span className="typing-dot"></span>
+            </div>
+            <div>
+              <div className={`fw-semibold mb-1 ${isScrapingPrep ? 'text-success' : 'text-warning'}`}>
+                <i className={`${isScrapingPrep ? 'fas fa-spider' : 'fas fa-brain'} me-2`}></i>
+                {progress.description || 'Processing your request...'}
+              </div>
+              <small className="text-muted">
+                {isScrapingPrep ? 'Preparing web scraping tools...' : 'AI is working on your question...'}
+              </small>
+            </div>
+          </Card.Body>
+        </Card>
+      </div>
+    );
+  }
 
   const getStepIcon = (step) => {
     switch (step) {

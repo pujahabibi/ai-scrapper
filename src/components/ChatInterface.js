@@ -50,7 +50,8 @@ Try asking me something or give me a URL to scrape!`,
     console.log('🔄 Starting progress polling for session:', currentSessionId);
     
     let pollAttempts = 0;
-    const maxAttempts = 100; // Max 30 seconds of polling at 300ms intervals
+    const maxAttempts = 120; // Max 36 seconds of polling at 300ms intervals
+    let lastProgressStep = '';
     
     progressInterval.current = setInterval(async () => {
       pollAttempts++;
@@ -60,10 +61,22 @@ Try asking me something or give me a URL to scrape!`,
         
         if (response && response.data) {
           const progressData = response.data;
-          console.log(`📊 Poll ${pollAttempts}: ${progressData.step} - ${progressData.description}`);
           
-          // Update progress for any valid step
+          // Log all progress updates, especially new ones
+          if (progressData.step !== lastProgressStep) {
+            console.log(`📊 NEW Progress Update: ${progressData.step} - ${progressData.description}`);
+            lastProgressStep = progressData.step;
+          } else {
+            console.log(`📊 Poll ${pollAttempts}: ${progressData.step} - ${progressData.description}`);
+          }
+          
+          // Always update progress - don't skip any steps
           setProgress(progressData);
+          
+          // Show progress immediately for any valid step (not just 'waiting')
+          if (progressData.step && progressData.step !== 'waiting') {
+            setShowProgress(true);
+          }
           
           if (progressData.completed) {
             console.log('✅ Progress completed, stopping polling');
@@ -87,7 +100,7 @@ Try asking me something or give me a URL to scrape!`,
         console.log('⏰ Max polling attempts reached, stopping');
         stopProgressPolling();
       }
-    }, 300); // Poll every 300ms
+    }, 250); // Poll every 250ms for more responsive updates
   };
 
   const stopProgressPolling = () => {
@@ -140,6 +153,9 @@ Try asking me something or give me a URL to scrape!`,
       // Start progress polling IMMEDIATELY - we now have a guaranteed session ID
       console.log('📡 Starting progress polling immediately for session:', currentSessionId);
       startProgressPolling(currentSessionId);
+      
+      // Add a small delay to ensure the progress endpoint is ready
+      await new Promise(resolve => setTimeout(resolve, 100));
 
       // Make the API call with our session ID
       const response = await axios.post('/chat', {

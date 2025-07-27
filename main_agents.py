@@ -315,6 +315,8 @@ async def process_user_request(user_input: str, session: SQLiteSession):
         )
         progress_store[session_id] = progress_update
         print(f"🔄 Progress Update: {step} - {description} [Session: {session_id}]")
+        print(f"📤 Progress stored in progress_store for session: {session_id}")
+        print(f"📊 Current progress_store keys: {list(progress_store.keys())}")
     
     print("🤖 Multi-Agent Request Processor with Session Memory")
     print("=" * 60)

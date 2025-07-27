@@ -83,15 +83,20 @@ async def get_progress(session_id: str):
     
     if session_id not in progress_store:
         print(f"⚠️ Session {session_id} not found in progress_store")
-        return ProgressUpdate(
+        # Create initial waiting state and store it
+        waiting_progress = ProgressUpdate(
             step="waiting",
             description="Waiting for processing to start...",
             session_id=session_id,
             completed=False
         )
+        progress_store[session_id] = waiting_progress
+        print(f"📤 Created waiting progress for session: {session_id}")
+        return waiting_progress
     
     current_progress = progress_store[session_id]
     print(f"✅ Returning progress: {current_progress.step} - {current_progress.description}")
+    print(f"📤 Sent to frontend: {current_progress.step} | {current_progress.description}")
     return current_progress
 
 @app.get("/sessions/{session_id}/history")
