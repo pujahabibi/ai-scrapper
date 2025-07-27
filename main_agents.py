@@ -38,7 +38,7 @@ class RegularAnswer(BaseModel):
 
 class ScrapeResult(BaseModel):
     text: str
-    result: List[Dict] = []  # Updated to match the new structure
+    data_found: str = ""  # Updated to match agent output
 
 # FastAPI request/response models
 class ChatRequest(BaseModel):
@@ -96,92 +96,147 @@ regular_qa_agent = Agent(
     model="gpt-4.1-mini",
 )
 
+# Agent 3: Web Scraping Agent - Handles data extraction from URLs
+web_scraping_agent = Agent(
+    name="Web Scraping Specialist",
+    instructions="""You are a highly skilled web scraper specializing in complete data extraction from websites.
+
+CRITICAL REQUIREMENTS FOR 100% DATA EXTRACTION:
+1. EXTRACT EVERY SINGLE ITEM - You must find ALL data entries, not just the first few
+2. SCAN THE ENTIRE CONTENT - Read through ALL content, not just the beginning
+3. MULTIPLE PASSES - Look for data in different HTML structures, classes, and sections
+4. NO SHORTCUTS - Do not stop until you've found every possible data entry
+5. VERIFY COMPLETENESS - Double-check that you haven't missed any items
+
+DATA IDENTIFICATION PATTERNS (look for ALL of these):
+- Repeating patterns of structured information
+- Lists, tables, or card-based layouts
+- Links to individual items/pages
+- Reference numbers or IDs
+- Prices, dates, locations, names
+- Similar formatting patterns
+- JSON or structured data embedded in HTML
+
+EXTRACTION STRATEGY:
+1. First, identify the main content area and data patterns
+2. Scan for obvious containers/cards/list items
+3. Look for repeating patterns of similar information
+4. Check for any hidden or dynamically loaded content references
+5. Look in different sections (main content, sidebars, nested areas)
+6. Count items as you find them to ensure completeness
+
+For structured data (like job listings, products, articles), extract:
+- All identifying information (titles, names, IDs)
+- All descriptive content (descriptions, details)
+- All metadata (dates, locations, categories, prices)
+- All contact or reference information
+- Any additional relevant fields specific to the content type
+
+IMPORTANT: Be thorough and extract EVERY item you find. Don't stop at 10 or 15 items if there are clearly more available. Your goal is 100% capture rate.
+
+SPECIAL INSTRUCTIONS FOR MEDRECRUIT/JOB SITES:
+- Each page typically contains 20 job listings
+- Look for salary amounts ($ per hour/day)
+- Find medical specialties and locations
+- Extract job types (Locum, Permanent)
+- Get hospital descriptions and job IDs
+- Look for "SAVE JOB" buttons as indicators
+- Scan for NSW cities and medical terms
+
+You must return a valid JSON object with this exact structure:
+{
+    "text": "Your comprehensive summary of what you found including count",
+    "data_found": "All extracted data in a well-formatted, structured way"
+}
+
+Return a comprehensive summary in 'text' that includes the count of items found, and format all extracted data clearly in 'data_found' as a structured, readable format.""",
+    output_type=ScrapeResult,
+    model="gpt-4.1-mini",
+    model_settings=ModelSettings(
+        max_tokens=32000,
+        temperature=0,  # Lower temperature for more consistent extraction
+    ),
+)
+
 # ─── Multi-page Web Scraping Functions ────────────────────────────────────────
 
-def scrape_data_bs(url: str, question: str) -> ScrapeResult:
-    """Scrape a single page using BeautifulSoup with Selenium fallback"""
+async def scrape_data_bs(url: str, question: str) -> ScrapeResult:
+    """Scrape a single page using requests with Selenium fallback"""
     headers = {
         "User-Agent": "Mozilla/5.0 (compatible; MyScraper/1.0; +https://yourdomain.com/bot)"
     }
 
+    # First try to get website content
+    html = None
     try:
-        response = requests.get(url, headers=headers)
+        print(f"🌐 Fetching content from: {url}")
+        response = requests.get(url, headers=headers, timeout=30)
         response.raise_for_status()  # throws if status != 200
         html = response.text
+        print(f"✅ Successfully fetched with requests (length: {len(html)})")
     except Exception as e:
-        print(f"Request failed: {e}. Trying with Selenium...")
+        print(f"❌ Request failed: {e}. Trying with Selenium...")
         try:
-            driver = webdriver.Chrome()
+            from selenium import webdriver
+            from selenium.webdriver.chrome.options import Options
+            
+            chrome_options = Options()
+            chrome_options.add_argument("--headless")
+            chrome_options.add_argument("--no-sandbox")
+            chrome_options.add_argument("--disable-dev-shm-usage")
+            
+            driver = webdriver.Chrome(options=chrome_options)
             driver.get(url)
             html = driver.page_source
             driver.quit()
+            print(f"✅ Successfully fetched with Selenium (length: {len(html)})")
         except Exception as selenium_error:
-            print(f"Selenium also failed: {selenium_error}")
+            print(f"❌ Selenium also failed: {selenium_error}")
             return ScrapeResult(
-                text="Failed to scrape the website",
+                text="Failed to scrape the website - both requests and Selenium failed",
                 result=[]
             )
     
-    system_prompt = """
-    Your task is to extract the data from scrape website, and return the data in a structured format based on the user's question or request.
-    If there is a content where one of users' request is not found, just return the key with value "-".
-    If users give broken or invalid link, return the text that says "The link is broken or invalid" and the result is empty list.
-    for example:
-        {
-            "text": "The text about the content of the page",
-            "result": [
-                {
-                    "key1": "value1",
-                    "key2": "-"
-                }
-            ]
-        }
-    You must return a valid JSON object with this exact structure:
-    {
-        "text": "Your descriptive text about what you found",
-        "result": [
-            {
-                "key1": "value1",
-                "key2": "value2"
-            }
-        ]
-    }
+    if not html:
+        return ScrapeResult(
+            text="Failed to fetch website content",
+            data_found=""
+        )
+    
+    # Use the web scraping agent instead of direct API call
+    scraping_prompt = f"""
+    User Request: {question}
+    Website URL: {url}
+    Website Content: {html}
+    
+    Please analyze this website content and extract ALL relevant information based on the user's request.
+    Clean the data from HTML tags like <p> and </p> and other HTML tags.
+    
+    IMPORTANT: For Medrecruit job pages, extract ALL job listings (typically 20 per page).
+    Look for job titles, specialties, locations, salaries, dates, hospital info, and job IDs.
     """
     
-    user_prompt = f"Here is the detail instruction: {question}, here is the html: {html}"
-
-    response = client.chat.completions.create(
-        model="gpt-4.1-mini",
-        messages=[
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt}
-        ],
-        temperature=0.2,
-        max_tokens=20000,
+    # Create a simple session for the agent call
+    temp_session = SQLiteSession("scrape_session", "scrape_temp.db")
+    
+    # Run the web scraping agent
+    scrape_result = await Runner.run(
+        web_scraping_agent,
+        scraping_prompt,
+        session=temp_session
     )
     
-    # Parse the response - prioritize simple JSON parsing
+    # Get the result from the agent
     try:
-        response_content = response.choices[0].message.content
-        print(f"🔍 Raw response: {response_content[:200]}...")
-        result_data = json.loads(response_content)
+        scraped_data = scrape_result.final_output_as(ScrapeResult)
+        print(f"🔍 Agent extracted: {scraped_data.text[:100]}...")
+        return scraped_data
+    except Exception as e:
+        print(f"❌ Agent extraction failed: {e}")
         return ScrapeResult(
-            text=result_data.get("text", ""),
-            result=result_data.get("result", [])
+            text="Failed to extract data using agent",
+            data_found=""
         )
-    except json.JSONDecodeError as e:
-        print(f"❌ JSON parsing failed: {e}")
-        # Try with JsonOutputParser as fallback
-        try:
-            parser = JsonOutputParser(pydantic_object=ScrapeResult)
-            parsed_output = parser.parse(response.choices[0].message.content)
-            return parsed_output
-        except Exception as parser_error:
-            print(f"❌ Parser also failed: {parser_error}")
-            return ScrapeResult(
-                text="Failed to parse response",
-                result=[]
-            )
 
 def update_url_page(url: str, page: int) -> str:
     """
@@ -212,7 +267,7 @@ def extract_page_range(question: str):
             return int(m.group(1)), int(m.group(2))
     return None
 
-def flexible_scrape(url: str, question: str, update_progress_callback=None) -> ScrapeResult:
+async def flexible_scrape(url: str, question: str, update_progress_callback=None) -> ScrapeResult:
     """
     If `question` specifies a page range, loops from start→end; otherwise
     scrapes just the single `url`. Returns a ScrapeResult object.
@@ -233,7 +288,7 @@ def flexible_scrape(url: str, question: str, update_progress_callback=None) -> S
         if update_progress_callback:
             update_progress_callback("scraping", f"🌐 Scraping page {i}/{total_pages}: {u[:50]}...")
         print(f"Scraping {u} ({i}/{total_pages})...")
-        per_page_outputs.append(scrape_data_bs(u, question))
+        per_page_outputs.append(await scrape_data_bs(u, question))
 
     # if only one page, just return it
     if len(per_page_outputs) == 1:
@@ -242,10 +297,10 @@ def flexible_scrape(url: str, question: str, update_progress_callback=None) -> S
     # otherwise, combine them into one ScrapeResult
     if update_progress_callback:
         update_progress_callback("analyzing", f"🧠 Combining data from {total_pages} pages...")
-    combined = combine_results(per_page_outputs)
+    combined = await combine_results(per_page_outputs)
     return combined
 
-def combine_results(scrape_results: List[ScrapeResult]) -> ScrapeResult:
+async def combine_results(scrape_results: List[ScrapeResult]) -> ScrapeResult:
     """
     Takes multiple ScrapeResult objects and asks the LLM to merge them
     into one valid ScrapeResult.
@@ -260,44 +315,46 @@ def combine_results(scrape_results: List[ScrapeResult]) -> ScrapeResult:
     }
     '''
     
-    # Convert ScrapeResult objects to JSON strings for the prompt
-    json_strings = []
-    for sr in scrape_results:
-        json_strings.append(json.dumps({"text": sr.text, "result": sr.result}, indent=2))
+    # Use the web scraping agent to combine results
+    combined_text_parts = []
+    combined_data_parts = []
     
-    joined = "\n\n".join(json_strings)
-    user_prompt = f"Please merge the following JSON objects into one object, combining all result arrays and creating a comprehensive text summary:\n\n{joined}"
-
-    resp = client.chat.completions.create(
-        model="gpt-4.1-mini",
-        messages=[
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt}
-        ],
-        temperature=0.1,
-        max_tokens=32000,
+    for sr in scrape_results:
+        combined_text_parts.append(sr.text)
+        if sr.data_found:
+            combined_data_parts.append(sr.data_found)
+    
+    combination_prompt = f"""
+    Please combine and consolidate the following scraped data from multiple pages:
+    
+    Text summaries from each page:
+    {chr(10).join([f"Page {i+1}: {text}" for i, text in enumerate(combined_text_parts)])}
+    
+    Data from each page:
+    {chr(10).join([f"--- Page {i+1} Data ---{chr(10)}{data}{chr(10)}" for i, data in enumerate(combined_data_parts)])}
+    
+    Please create a comprehensive combined summary and merge all the data into a single, well-formatted result.
+    """
+    
+    # Create a simple session for the combination
+    temp_session = SQLiteSession("combine_session", "combine_temp.db")
+    
+    # Run the web scraping agent to combine results
+    combine_result = await Runner.run(
+        web_scraping_agent,
+        combination_prompt,
+        session=temp_session
     )
-
+    
     try:
-        response_content = resp.choices[0].message.content
-        result_data = json.loads(response_content)
+        combined_data = combine_result.final_output_as(ScrapeResult)
+        return combined_data
+    except Exception as e:
+        print(f"❌ Agent combination failed: {e}")
         return ScrapeResult(
-            text=result_data.get("text", ""),
-            result=result_data.get("result", [])
+            text="Failed to combine results using agent",
+            data_found=""
         )
-    except json.JSONDecodeError as e:
-        print(f"❌ JSON parsing failed: {e}")
-        # Try with JsonOutputParser as fallback
-        try:
-            parser = JsonOutputParser(pydantic_object=ScrapeResult)
-            parsed_output = parser.parse(resp.choices[0].message.content)
-            return parsed_output
-        except Exception as parser_error:
-            print(f"❌ Parser also failed: {parser_error}")
-            return ScrapeResult(
-                text="Failed to combine results",
-                result=[]
-            )
 
 # Main workflow orchestrator with session support and progress tracking
 async def process_user_request(user_input: str, session: SQLiteSession):
@@ -411,7 +468,7 @@ async def process_user_request(user_input: str, session: SQLiteSession):
             
             # Use the new flexible scraping function with progress callback
             try:
-                scraped_data = flexible_scrape(url, question, update_progress_callback=update_progress)
+                scraped_data = await flexible_scrape(url, question, update_progress_callback=update_progress)
             except Exception as scrape_error:
                 print(f"❌ Scraping failed: {scrape_error}")
                 update_progress("error", "❌ Failed to scrape website", completed=True)
@@ -429,9 +486,9 @@ async def process_user_request(user_input: str, session: SQLiteSession):
             print(f"Request: {question}")
             print(f"Summary: {scraped_data.text}")
             
-            if scraped_data.result:
-                print(f"\nExtracted Data ({len(scraped_data.result)} items):")
-                print(json.dumps(scraped_data.result, indent=2))
+            if scraped_data.data_found:
+                print("\nExtracted Data:")
+                print(scraped_data.data_found)
             else:
                 print("\nNo specific data extracted.")
             
@@ -445,9 +502,8 @@ async def process_user_request(user_input: str, session: SQLiteSession):
                 page_info = f" (Pages {start}-{end})"
             
             response_text = f"**Scraped from:** {url}{page_info}\n\n**Summary:** {scraped_data.text}"
-            if scraped_data.result:
-                response_text += f"\n\n**Extracted Data ({len(scraped_data.result)} items):**\n"
-                response_text += json.dumps(scraped_data.result, indent=2)
+            if scraped_data.data_found:
+                response_text += f"\n\n**Extracted Data:**\n{scraped_data.data_found}"
             
             # Mark as completed
             update_progress("completed", "✅ Scraping complete!", completed=True)
