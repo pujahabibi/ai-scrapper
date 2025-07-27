@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Diagnostic Page - AI Scrapper</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-item { margin: 10px 0; padding: 10px; border: 1px solid #ddd; }
+        .success { background-color: #d4edda; color: #155724; }
+        .error { background-color: #f8d7da; color: #721c24; }
+        button { padding: 10px 20px; margin: 5px; cursor: pointer; }
+        #results { margin-top: 20px; }
+        .loading { color: #007bff; }
+    </style>
+</head>
+<body>
+    <h1>🔧 AI Scrapper Diagnostic Tool</h1>
+    <p>This page helps diagnose issues with the chat interface.</p>
+    
+    <div class="test-item">
+        <h3>1. Server Health Check</h3>
+        <button onclick="testHealth()">Test Health Endpoint</button>
+        <div id="health-result"></div>
+    </div>
+    
+    <div class="test-item">
+        <h3>2. Static Files Test</h3>
+        <button onclick="testStaticFiles()">Test CSS & JS Loading</button>
+        <div id="static-result"></div>
+    </div>
+    
+    <div class="test-item">
+        <h3>3. Chat API Test</h3>
+        <button onclick="testChat()">Test Chat Endpoint</button>
+        <div id="chat-result"></div>
+    </div>
+    
+    <div class="test-item">
+        <h3>4. Progress Polling Test</h3>
+        <button onclick="testProgress()">Test Progress Endpoint</button>
+        <div id="progress-result"></div>
+    </div>
+    
+    <div class="test-item">
+        <h3>5. Main Chat Interface</h3>
+        <a href="/" target="_blank">
+            <button>Open Main Chat Interface</button>
+        </a>
+        <p><small>Check browser console (F12) for any JavaScript errors</small></p>
+    </div>
+    
+    <div id="results">
+        <h3>📋 Test Results</h3>
+        <div id="summary"></div>
+    </div>
+
+    <script>
+        let testResults = [];
+
+        function addResult(test, success, message) {
+            testResults.push({test, success, message});
+            updateSummary();
+        }
+
+        function updateSummary() {
+            const summary = document.getElementById('summary');
+            summary.innerHTML = testResults.map(result => 
+                `<div class="${result.success ? 'success' : 'error'}">
+                    ${result.test}: ${result.success ? '✅' : '❌'} ${result.message}
+                </div>`
+            ).join('');
+        }
+
+        async function testHealth() {
+            const resultDiv = document.getElementById('health-result');
+            resultDiv.innerHTML = '<div class="loading">Testing...</div>';
+            
+            try {
+                const response = await fetch('/health');
+                const data = await response.json();
+                
+                if (response.ok) {
+                    resultDiv.innerHTML = `<div class="success">✅ Health OK: ${data.message}</div>`;
+                    addResult('Health Check', true, 'Server is healthy');
+                } else {
+                    resultDiv.innerHTML = `<div class="error">❌ Health check failed: ${response.status}</div>`;
+                    addResult('Health Check', false, `Status: ${response.status}`);
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="error">❌ Error: ${error.message}</div>`;
+                addResult('Health Check', false, error.message);
+            }
+        }
+
+        async function testStaticFiles() {
+            const resultDiv = document.getElementById('static-result');
+            resultDiv.innerHTML = '<div class="loading">Testing...</div>';
+            
+            try {
+                const cssResponse = await fetch('/static/style.css');
+                const jsResponse = await fetch('/static/script.js');
+                
+                if (cssResponse.ok && jsResponse.ok) {
+                    resultDiv.innerHTML = '<div class="success">✅ Static files loading correctly</div>';
+                    addResult('Static Files', true, 'CSS and JS files accessible');
+                } else {
+                    resultDiv.innerHTML = `<div class="error">❌ Static files issue: CSS(${cssResponse.status}) JS(${jsResponse.status})</div>`;
+                    addResult('Static Files', false, `CSS: ${cssResponse.status}, JS: ${jsResponse.status}`);
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="error">❌ Error: ${error.message}</div>`;
+                addResult('Static Files', false, error.message);
+            }
+        }
+
+        async function testChat() {
+            const resultDiv = document.getElementById('chat-result');
+            resultDiv.innerHTML = '<div class="loading">Testing chat API...</div>';
+            
+            try {
+                const response = await fetch('/chat', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        message: 'Hello, this is a diagnostic test',
+                        session_id: 'diagnostic_session'
+                    })
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    resultDiv.innerHTML = `<div class="success">✅ Chat API working: ${data.request_type}</div>`;
+                    addResult('Chat API', true, `Response type: ${data.request_type}`);
+                } else {
+                    resultDiv.innerHTML = `<div class="error">❌ Chat API failed: ${response.status}</div>`;
+                    addResult('Chat API', false, `Status: ${response.status}`);
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="error">❌ Error: ${error.message}</div>`;
+                addResult('Chat API', false, error.message);
+            }
+        }
+
+        async function testProgress() {
+            const resultDiv = document.getElementById('progress-result');
+            resultDiv.innerHTML = '<div class="loading">Testing progress API...</div>';
+            
+            try {
+                const response = await fetch('/progress/test_session');
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    resultDiv.innerHTML = `<div class="success">✅ Progress API working: ${data.step}</div>`;
+                    addResult('Progress API', true, `Step: ${data.step}`);
+                } else {
+                    resultDiv.innerHTML = `<div class="error">❌ Progress API failed: ${response.status}</div>`;
+                    addResult('Progress API', false, `Status: ${response.status}`);
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="error">❌ Error: ${error.message}</div>`;
+                addResult('Progress API', false, error.message);
+            }
+        }
+
+        // Auto-run basic tests on page load
+        window.onload = function() {
+            setTimeout(() => {
+                testHealth();
+                setTimeout(() => testStaticFiles(), 500);
+            }, 100);
+        };
+    </script>
+</body>
+</html> 
