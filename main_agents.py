@@ -61,6 +61,114 @@ class ProgressUpdate(BaseModel):
 active_sessions = {}
 progress_store = {}  # Store progress updates by session_id
 
+# Simple context extraction for scraped data follow-up questions
+async def get_scraped_data_context(session: SQLiteSession) -> str:
+    """Extract previous scraped data from conversation history for follow-up questions"""
+    try:
+        # Get recent conversation history using the correct method
+        items = await session.get_items()
+        if not items:
+            return "No previous scraped data found in conversation history."
+            
+        print(f"✅ Retrieved {len(items)} conversation items")
+        
+        # Look for assistant responses containing scraped data
+        for item in reversed(items):  # Check most recent first
+            # Handle different item formats from the agents SDK
+            content = ""
+            role = ""
+            
+            if isinstance(item, dict):
+                role = item.get('role', '')
+                
+                # Handle the complex content structure from agents framework
+                item_content = item.get('content', '')
+                if isinstance(item_content, list) and len(item_content) > 0:
+                    # Extract text from the first content item
+                    first_content = item_content[0]
+                    if isinstance(first_content, dict):
+                        content = first_content.get('text', '')
+                elif isinstance(item_content, str):
+                    content = item_content
+            elif hasattr(item, 'content') and hasattr(item, 'role'):
+                content = str(item.content)
+                role = item.role
+            else:
+                continue
+                
+            # Look for assistant messages with scraped data
+            if role == 'assistant' and '**Extracted Data:**' in content:
+                print(f"✅ Found scraped data in assistant message")
+                
+                # Extract the JSON part after "**Extracted Data:**"
+                try:
+                    # Find the start of the JSON data
+                    json_start = content.find('**Extracted Data:**')
+                    if json_start == -1:
+                        continue
+                        
+                    # Get everything after the "**Extracted Data:**" marker
+                    json_section = content[json_start + len('**Extracted Data:**'):].strip()
+                    
+                    # Find the JSON array (starts with [ and ends with ])
+                    bracket_start = json_section.find('[')
+                    if bracket_start == -1:
+                        continue
+                        
+                    # Find the matching closing bracket
+                    bracket_count = 0
+                    json_end = -1
+                    for i, char in enumerate(json_section[bracket_start:], bracket_start):
+                        if char == '[':
+                            bracket_count += 1
+                        elif char == ']':
+                            bracket_count -= 1
+                            if bracket_count == 0:
+                                json_end = i + 1
+                                break
+                    
+                    if json_end == -1:
+                        continue
+                        
+                    json_text = json_section[bracket_start:json_end]
+                    
+                    # Parse the JSON to extract job information
+                    import json
+                    job_data = json.loads(json_text)
+                    
+                    if not job_data:
+                        continue
+                        
+                    print(f"✅ Successfully parsed {len(job_data)} jobs from JSON data")
+                    
+                    # Create structured context with full job data for salary analysis
+                    context = "PREVIOUS SCRAPED JOB DATA:\n\n"
+                    context += f"Found {len(job_data)} job listings with the following details:\n\n"
+                    
+                    for i, job in enumerate(job_data, 1):
+                        context += f"{i}. {job.get('title', 'Unknown Position')}\n"
+                        context += f"   Location: {job.get('location', 'Unknown')}\n"
+                        context += f"   Salary: {job.get('payRate', 'Not specified')}\n"
+                        context += f"   Type: {job.get('workType', 'Unknown')}\n"
+                        if job.get('jobNumber'):
+                            context += f"   Job ID: {job.get('jobNumber')}\n"
+                        context += "\n"
+                    
+                    return context
+                    
+                except json.JSONDecodeError as e:
+                    print(f"❌ JSON parsing failed: {e}")
+                    continue
+                except Exception as parse_error:
+                    print(f"❌ Error parsing scraped data: {parse_error}")
+                    continue
+        
+        return "No previous scraped data found in conversation history."
+        
+    except Exception as e:
+        print(f"⚠️ Error getting scraped data context: {e}")
+        return "Unable to retrieve previous scraped data context."
+
 # Agent 1: Request Classifier - Determines if user wants regular Q&A or web scraping
 request_classifier_agent = Agent(
     name="Request Classifier",
@@ -69,6 +177,7 @@ request_classifier_agent = Agent(
     1. REGULAR QUESTION: General questions, math problems, explanations, advice, follow-up questions, etc.
        - Examples: "What is the capital of France?", "How do I cook pasta?", "Explain photosynthesis"
        - Follow-up questions: "What about Italy?", "Tell me more", "Can you explain that better?", "Summarize the content of the website"
+       - Questions about previously scraped data: "Which job has the highest salary?", "Tell me more about the first job", "How many jobs were found?"
        
     2. SCRAPE DATA: Requests to extract data from websites or URLs
        - Examples: "Scrape data from https://example.com", "Extract information from this website: [URL]", 
@@ -77,7 +186,7 @@ request_classifier_agent = Agent(
     CLASSIFICATION RULES:
     - If the input contains a URL (http/https) AND asks to extract/scrape/get data, classify as "scrape_data"
     - If the input mentions scraping, extracting, or getting data from a website, classify as "scrape_data"
-    - Everything else is "regular_question" (including follow-up questions)
+    - Everything else is "regular_question" (including follow-up questions about previously scraped data)
     
     Extract the URL if present and the core question/request.""",
     output_type=RequestClassification,
@@ -88,10 +197,19 @@ request_classifier_agent = Agent(
 regular_qa_agent = Agent(
     name="Regular Q&A Assistant",
     instructions="""You are a helpful assistant that answers questions clearly and accurately. 
-    You can see the conversation history and should reference previous context when relevant.
-    Provide comprehensive answers with explanations when helpful. Be conversational and informative.
+
+    CONTEXT AWARENESS:
+    - You have access to conversation history including any previously scraped data
+    - When users ask follow-up questions about scraped data, reference the specific data to provide accurate answers
+    - For questions like "which job has the highest salary" or "tell me about the first job", use the scraped data context
     
-    For follow-up questions, make sure to reference what was discussed previously.""",
+    RESPONSE GUIDELINES:
+    - Be conversational and provide comprehensive answers
+    - When referencing scraped data, be specific about the details (job titles, salaries, locations, etc.)
+    - If asked about comparisons (highest/lowest salary, best location, etc.), analyze the data and provide clear answers
+    - Include relevant details from the scraped data to support your answers
+    
+    For follow-up questions about scraped data, make sure to reference the actual data that was previously extracted.""",
     output_type=RegularAnswer,
     model="gpt-4.1-mini",
 )
@@ -131,23 +249,9 @@ For structured data (like job listings, products, articles), extract:
 - All metadata (dates, locations, categories, prices)
 - All contact or reference information
 - Any additional relevant fields specific to the content type
+- Do not delete or merge any data. just extract it is what it is.
 
 IMPORTANT: Be thorough and extract EVERY item you find. Don't stop at 10 or 15 items if there are clearly more available. Your goal is 100% capture rate.
-
-SPECIAL INSTRUCTIONS FOR MEDRECRUIT/JOB SITES:
-- Each page typically contains 20 job listings
-- Look for salary amounts ($ per hour/day)
-- Find medical specialties and locations
-- Extract job types (Locum, Permanent)
-- Get hospital descriptions and job IDs
-- Look for "SAVE JOB" buttons as indicators
-- Scan for NSW cities and medical terms
-
-You must return a valid JSON object with this exact structure:
-{
-    "text": "Your comprehensive summary of what you found including count",
-    "data_found": "All extracted data in a well-formatted, structured way"
-}
 
 Return a comprehensive summary in 'text' that includes the count of items found, and format all extracted data clearly in 'data_found' as a structured, readable format.""",
     output_type=ScrapeResult,
@@ -404,10 +508,22 @@ async def process_user_request(user_input: str, session: SQLiteSession):
             update_progress("processing", "📚 Generating answer to your question...")
             print("\n📚 Routing to Regular Q&A Agent...")
             
-            # Handle regular question with session memory
+            # Get scraped data context for follow-up questions
+            scraped_context = await get_scraped_data_context(session)
+            
+            # Enhanced prompt with scraped data context
+            qa_prompt = f"""
+            User Question: {user_input}
+            
+            {scraped_context}
+            
+            Please answer the user's question. If it relates to previously scraped data shown above, use that information to provide a specific, detailed answer.
+            """
+            
+            # Handle regular question with session memory and scraped data context
             qa_result = await Runner.run(
                 regular_qa_agent, 
-                user_input,
+                qa_prompt,
                 session=session  # Agent can see conversation history
             )
             answer = qa_result.final_output_as(RegularAnswer)
@@ -504,6 +620,12 @@ async def process_user_request(user_input: str, session: SQLiteSession):
             response_text = f"**Scraped from:** {url}{page_info}\n\n**Summary:** {scraped_data.text}"
             if scraped_data.data_found:
                 response_text += f"\n\n**Extracted Data:**\n{scraped_data.data_found}"
+            
+            # Store the scraped response in the session for future reference
+            await session.add_items([
+                {"role": "assistant", "content": response_text}
+            ])
+            print("✅ Stored scraped data in session for future reference")
             
             # Mark as completed
             update_progress("completed", "✅ Scraping complete!", completed=True)
