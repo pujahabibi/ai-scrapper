@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Multi-Agent Chat Interface</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="chat-container">
+        <div class="chat-header">
+            <h1>🤖 Multi-Agent Chat</h1>
+            <p>Ask questions or request web scraping - I remember our conversation!</p>
+        </div>
+        
+        <div class="chat-messages" id="chatMessages">
+            <div class="message bot">
+                <div class="message-content">
+                    Hi! I'm your AI assistant with multi-agent capabilities. I can:
+                    
+                    📚 Answer questions and have conversations
+                    🕷️ Scrape and analyze websites
+                    🧠 Remember our conversation context
+                    
+                    Try asking me something or give me a URL to scrape!
+                </div>
+            </div>
+        </div>
+        
+        <div class="typing-indicator" id="typingIndicator">
+            <span class="typing-dot"></span>
+            <span class="typing-dot"></span>
+            <span class="typing-dot"></span>
+            AI is thinking...
+        </div>
+        
+        <div class="chat-input">
+            <div class="input-group">
+                <input 
+                    type="text" 
+                    class="message-input" 
+                    id="messageInput" 
+                    placeholder="Type your message or paste a URL to scrape..."
+                    maxlength="1000"
+                >
+                <button class="send-button" id="sendButton">Send</button>
+            </div>
+        </div>
+        
+        <div class="session-info">
+            <span id="sessionInfo">Session: Initializing...</span>
+            <button class="clear-button" id="clearButton">Clear Chat</button>
+        </div>
+    </div>
+
+    <script src="/static/script.js"></script>
+</body>
+</html> 
