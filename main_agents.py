@@ -50,7 +50,6 @@ class ChatResponse(BaseModel):
 class ProgressUpdate(BaseModel):
     step: str
     description: str
-    progress: int  # 0-100
     session_id: str
     completed: bool = False
 
@@ -122,6 +121,7 @@ async def web_scraping_function(user_request: str, url: str, website_content: st
     
     Please analyze this website content and extract ALL relevant information based on the user's request.
     Return your response as a JSON object with "text" and "data_found" fields.
+    Clean the data_found from the html tags like <p> and </p> and other html tags.
     """
     
     response = client.chat.completions.create(
@@ -131,7 +131,7 @@ async def web_scraping_function(user_request: str, url: str, website_content: st
             {"role": "user", "content": user_prompt}
         ],
         temperature=0.1,
-        max_tokens=18000,
+        max_tokens=26000,
     )
     
     try:
@@ -186,16 +186,15 @@ async def process_user_request(user_input: str, session: SQLiteSession):
     session_id = session.session_id
     
     # Initialize progress tracking
-    def update_progress(step: str, description: str, progress: int, completed: bool = False):
+    def update_progress(step: str, description: str, completed: bool = False):
         progress_update = ProgressUpdate(
             step=step,
             description=description,
-            progress=progress,
             session_id=session_id,
             completed=completed
         )
         progress_store[session_id] = progress_update
-        print(f"🔄 Progress Update: {step} - {description} ({progress}%) [Session: {session_id}]")
+        print(f"🔄 Progress Update: {step} - {description} [Session: {session_id}]")
     
     print("🤖 Multi-Agent Request Processor with Session Memory")
     print("=" * 60)
@@ -205,10 +204,10 @@ async def process_user_request(user_input: str, session: SQLiteSession):
     
     try:
         # Step 1: Initialize processing
-        update_progress("initializing", "🤖 Starting AI analysis...", 10)
+        update_progress("initializing", "🤖 Starting AI analysis...")
         
         # Step 2: Classify the request (with session context)
-        update_progress("analyzing", "🔍 Analyzing the type of question...", 25)
+        update_progress("analyzing", "🔍 Analyzing the type of question...")
         print("Step 1: Classifying request type...")
         
         classification_result = await Runner.run(
@@ -223,7 +222,7 @@ async def process_user_request(user_input: str, session: SQLiteSession):
         
         # Step 3: Route to appropriate agent (with session context)
         if classification.request_type == "regular_question":
-            update_progress("processing", "📚 Generating answer to your question...", 50)
+            update_progress("processing", "📚 Generating answer to your question...")
             print("\n📚 Routing to Regular Q&A Agent...")
             
             # Handle regular question with session memory
@@ -234,7 +233,7 @@ async def process_user_request(user_input: str, session: SQLiteSession):
             )
             answer = qa_result.final_output_as(RegularAnswer)
             
-            update_progress("finalizing", "✅ Preparing response...", 90)
+            update_progress("finalizing", "✅ Preparing response...")
             
             print("\n" + "=" * 60)
             print("🎯 REGULAR Q&A RESULT:")
@@ -250,7 +249,7 @@ async def process_user_request(user_input: str, session: SQLiteSession):
                 response_text += f"\n\n{answer.explanation}"
             
             # Mark as completed
-            update_progress("completed", "✅ Answer ready!", 100, completed=True)
+            update_progress("completed", "✅ Answer ready!", completed=True)
             
             return {
                 "response": response_text,
@@ -259,7 +258,7 @@ async def process_user_request(user_input: str, session: SQLiteSession):
             }
             
         elif classification.request_type == "scrape_data":
-            update_progress("processing", "🕷️ Preparing to scrape website...", 40)
+            update_progress("processing", "🕷️ Preparing to scrape website...")
             print("\n🕷️ Routing to Web Scraping Agent...")
             
             # Extract URL and question
@@ -268,7 +267,7 @@ async def process_user_request(user_input: str, session: SQLiteSession):
             
             if not url:
                 print("❌ No URL found in scraping request")
-                update_progress("error", "❌ No URL found in request", 100, completed=True)
+                update_progress("error", "❌ No URL found in request", completed=True)
                 return {
                     "response": "Sorry, I need a URL to scrape data. Please provide a valid website URL.",
                     "request_type": classification.request_type,
@@ -276,11 +275,11 @@ async def process_user_request(user_input: str, session: SQLiteSession):
                 }
             
             # Step 4: Scrape website content
-            update_progress("scraping", f"🌐 Scraping data from {url[:50]}...", 60)
+            update_progress("scraping", f"🌐 Scraping data from {url[:50]}...")
             website_content = scrape_website_content(url)
             
             if website_content.startswith("Error"):
-                update_progress("error", "❌ Failed to scrape website", 100, completed=True)
+                update_progress("error", "❌ Failed to scrape website", completed=True)
                 return {
                     "response": f"Failed to scrape website: {website_content}",
                     "request_type": classification.request_type,
@@ -288,12 +287,12 @@ async def process_user_request(user_input: str, session: SQLiteSession):
                 }
             
             # Step 5: Process scraped content with AI
-            update_progress("analyzing", "🧠 Analyzing scraped content with AI...", 80)
+            update_progress("analyzing", "🧠 Analyzing scraped content with AI...")
             
             # Use the direct OpenAI client function
             scraped_data = await web_scraping_function(question, url, website_content)
             
-            update_progress("finalizing", "📋 Formatting extracted data...", 95)
+            update_progress("finalizing", "📋 Formatting extracted data...")
             
             print("\n" + "=" * 60)
             print("🕸️ WEB SCRAPING RESULT:")
@@ -315,7 +314,7 @@ async def process_user_request(user_input: str, session: SQLiteSession):
                 response_text += f"\n\n**Extracted Data:**\n{scraped_data.data_found}"
             
             # Mark as completed
-            update_progress("completed", "✅ Scraping complete!", 100, completed=True)
+            update_progress("completed", "✅ Scraping complete!", completed=True)
             
             return {
                 "response": response_text,
@@ -325,7 +324,7 @@ async def process_user_request(user_input: str, session: SQLiteSession):
             
         else:
             print(f"❌ Unknown request type: {classification.request_type}")
-            update_progress("error", "❌ Unknown request type", 100, completed=True)
+            update_progress("error", "❌ Unknown request type", completed=True)
             return {
                 "response": "Sorry, I couldn't understand your request type.",
                 "request_type": "unknown",
@@ -334,7 +333,7 @@ async def process_user_request(user_input: str, session: SQLiteSession):
             
     except Exception as e:
         print(f"❌ Error in workflow: {e}")
-        update_progress("error", f"❌ Error: {str(e)}", 100, completed=True)
+        update_progress("error", f"❌ Error: {str(e)}", completed=True)
         return {
             "response": f"An error occurred: {str(e)}",
             "request_type": "error",

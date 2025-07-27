@@ -60,7 +60,7 @@ Try asking me something or give me a URL to scrape!`,
         
         if (response && response.data) {
           const progressData = response.data;
-          console.log(`📊 Poll ${pollAttempts}: ${progressData.step} - ${progressData.description} (${progressData.progress}%)`);
+          console.log(`📊 Poll ${pollAttempts}: ${progressData.step} - ${progressData.description}`);
           
           // Update progress for any valid step
           setProgress(progressData);
@@ -106,7 +106,6 @@ Try asking me something or give me a URL to scrape!`,
     setProgress({
       step: 'initializing',
       description: '🤖 Initializing...',
-      progress: 0,
       completed: false
     });
 

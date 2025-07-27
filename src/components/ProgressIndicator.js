@@ -1,5 +1,5 @@
 import React from 'react';
-import { Card, ProgressBar, Badge } from 'react-bootstrap';
+import { Card, Badge } from 'react-bootstrap';
 
 function ProgressIndicator({ progress }) {
   if (!progress) {
@@ -101,22 +101,11 @@ function ProgressIndicator({ progress }) {
                 </span>
               </div>
               
-              {/* Progress bar */}
-              <ProgressBar 
-                now={progress.progress || 0} 
-                className="mb-2 progress-animated"
-                style={{ height: '8px' }}
-              >
-                <ProgressBar 
-                  animated
-                  variant={getStepColor(progress.step)}
-                  now={progress.progress || 0}
-                />
-              </ProgressBar>
-              
-              <div className="d-flex justify-content-between">
+              {/* Status indicator */}
+              <div className="d-flex justify-content-between align-items-center">
                 <small className="text-muted">
-                  Progress: {progress.progress || 0}%
+                  <i className="fas fa-clock me-1"></i>
+                  Processing your request...
                 </small>
                 {progress.completed && (
                   <small className="text-success fw-semibold">

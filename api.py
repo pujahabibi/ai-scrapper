@@ -86,13 +86,12 @@ async def get_progress(session_id: str):
         return ProgressUpdate(
             step="waiting",
             description="Waiting for processing to start...",
-            progress=0,
             session_id=session_id,
             completed=False
         )
     
     current_progress = progress_store[session_id]
-    print(f"✅ Returning progress: {current_progress.step} - {current_progress.description} ({current_progress.progress}%)")
+    print(f"✅ Returning progress: {current_progress.step} - {current_progress.description}")
     return current_progress
 
 @app.get("/sessions/{session_id}/history")
