@@ -275,7 +275,7 @@ def combine_results(scrape_results: List[ScrapeResult]) -> ScrapeResult:
             {"role": "user", "content": user_prompt}
         ],
         temperature=0.1,
-        max_tokens=36000,
+        max_tokens=32000,
     )
 
     try:
