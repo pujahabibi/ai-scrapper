@@ -288,32 +288,24 @@ Return a summary of how many links were found and what types of pages they lead 
 
 # ─── OpenAI Search Function for Link Processing ────────────────────────────────
 
-async def search_links_with_openai(links: List[str], user_question: str, update_progress_callback=None) -> List[Dict]:
+async def search_single_link_with_openai(link: str, user_question: str, index: int, total_links: int) -> Dict:
     """
-    Use OpenAI's search API to extract specific information from a list of links
+    Search a single link using OpenAI's search API
     """
-    results = []
-    total_links = len(links)
+    # Skip links marked as "-" (no website available)
+    if link == "-":
+        print(f"⏭️  Skipping link {index}/{total_links}: No website available")
+        return {
+            "extracted_data": {},
+            "source_url": "-",
+            "summary": "No website available for this club"
+        }
     
-    for i, link in enumerate(links, 1):
-        if update_progress_callback:
-            update_progress_callback("searching", f"🔍 Processing link {i}/{total_links}: {link[:50] if link != '-' else 'No website available'}...")
+    try:
+        print(f"🔍 Searching link {index}/{total_links}: {link}")
         
-        # Skip links marked as "-" (no website available)
-        if link == "-":
-            print(f"⏭️  Skipping link {i}/{total_links}: No website available")
-            results.append({
-                "extracted_data": {},
-                "source_url": "-",
-                "summary": "No website available for this club"
-            })
-            continue
-        
-        try:
-            print(f"🔍 Searching link {i}/{total_links}: {link}")
-            
-            # Create a focused search prompt that only extracts user-requested information
-            search_prompt = f"""Extract ONLY the specific information requested by the user from this link: {link}
+        # Create a focused search prompt that only extracts user-requested information
+        search_prompt = f"""Extract ONLY the specific information requested by the user from this link: {link}
 
 USER REQUEST: {user_question}
 
@@ -342,72 +334,116 @@ IMPORTANT:
 - Use field names that match the type of information being requested
 - If no relevant information is found, return empty extracted_data object
 - Be precise and focused on the user's actual request"""
+        
+        # Use OpenAI search API with structured output requirement
+        completion = client.chat.completions.create(
+            model="gpt-4o-mini-search-preview",
+            web_search_options={"search_context_size": "low"},
+            messages=[
+                {
+                    "role": "user",
+                    "content": search_prompt,
+                }
+            ]
+        )
+        
+        response_content = completion.choices[0].message.content
+        
+        # Parse the structured JSON response
+        try:
+            import json
+            import re
             
-            # Use OpenAI search API with structured output requirement
-            completion = client.chat.completions.create(
-                model="gpt-4o-mini-search-preview",
-                web_search_options={"search_context_size": "low"},
-                messages=[
-                    {
-                        "role": "user",
-                        "content": search_prompt,
-                    }
-                ]
-            )
-            
-            response_content = completion.choices[0].message.content
-            
-            # Parse the structured JSON response
+            # First, try to parse the entire response as JSON
             try:
-                import json
-                import re
-                
-                # First, try to parse the entire response as JSON
-                try:
-                    result_data = json.loads(response_content)
-                except json.JSONDecodeError:
-                    # If that fails, look for JSON object in the response
-                    json_match = re.search(r'\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}', response_content, re.DOTALL)
-                    if json_match:
-                        result_data = json.loads(json_match.group())
-                    else:
-                        # Fallback: create structured data from response
-                        result_data = {
-                            "extracted_data": {"content": response_content},
-                            "source_url": link,
-                            "summary": "Data extracted but not in expected JSON format"
-                        }
-                
-                # Validate the expected structure
-                if "extracted_data" in result_data and "source_url" in result_data and "summary" in result_data:
-                    results.append(result_data)
-                    print(f"✅ Successfully extracted structured data from: {link}")
+                result_data = json.loads(response_content)
+            except json.JSONDecodeError:
+                # If that fails, look for JSON object in the response
+                json_match = re.search(r'\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}', response_content, re.DOTALL)
+                if json_match:
+                    result_data = json.loads(json_match.group())
                 else:
-                    # Fallback structure if format is incorrect
-                    results.append({
-                        "extracted_data": result_data.get("extracted_data", result_data),
+                    # Fallback: create structured data from response
+                    result_data = {
+                        "extracted_data": {"content": response_content},
                         "source_url": link,
-                        "summary": result_data.get("summary", "Data extracted but format was incorrect")
-                    })
-                    print(f"⚠️ Extracted data with format issues from: {link}")
-                    
-            except (json.JSONDecodeError, Exception) as e:
-                print(f"❌ JSON parsing error for {link}: {e}")
-                results.append({
-                    "extracted_data": {"raw_content": response_content[:500]},
+                        "summary": "Data extracted but not in expected JSON format"
+                    }
+            
+            # Validate the expected structure
+            if "extracted_data" in result_data and "source_url" in result_data and "summary" in result_data:
+                print(f"✅ Successfully extracted structured data from: {link}")
+                return result_data
+            else:
+                # Fallback structure if format is incorrect
+                print(f"⚠️ Extracted data with format issues from: {link}")
+                return {
+                    "extracted_data": result_data.get("extracted_data", result_data),
                     "source_url": link,
-                    "summary": f"Failed to parse response as JSON: {str(e)}"
-                })
+                    "summary": result_data.get("summary", "Data extracted but format was incorrect")
+                }
                 
-        except Exception as e:
-            print(f"❌ Error searching {link}: {e}")
-            results.append({
-                "extracted_data": {},
+        except (json.JSONDecodeError, Exception) as e:
+            print(f"❌ JSON parsing error for {link}: {e}")
+            return {
+                "extracted_data": {"raw_content": response_content[:500]},
                 "source_url": link,
-                "summary": f"Error accessing page: {str(e)}"
-            })
+                "summary": f"Failed to parse response as JSON: {str(e)}"
+            }
+            
+    except Exception as e:
+        print(f"❌ Error searching {link}: {e}")
+        return {
+            "extracted_data": {},
+            "source_url": link,
+            "summary": f"Error accessing page: {str(e)}"
+        }
+
+async def search_links_with_openai(links: List[str], user_question: str, update_progress_callback=None) -> List[Dict]:
+    """
+    Use OpenAI's search API to extract specific information from a list of links using parallel processing
+    """
+    total_links = len(links)
+    print(f"🚀 Starting parallel processing of {total_links} links...")
     
-    return results
+    if update_progress_callback:
+        update_progress_callback("searching", f"🚀 Starting parallel search of {total_links} links...")
+    
+    # Create tasks for parallel processing
+    tasks = []
+    for i, link in enumerate(links, 1):
+        task = search_single_link_with_openai(link, user_question, i, total_links)
+        tasks.append(task)
+    
+    # Execute all tasks in parallel with progress updates
+    print(f"⚡ Processing {len(tasks)} links in parallel...")
+    
+    # Use asyncio.gather to run all searches concurrently
+    results = await asyncio.gather(*tasks, return_exceptions=True)
+    
+    # Handle any exceptions that occurred during parallel processing
+    processed_results = []
+    successful_results = 0
+    
+    for i, result in enumerate(results, 1):
+        if isinstance(result, Exception):
+            print(f"❌ Exception in link {i}: {result}")
+            processed_results.append({
+                "extracted_data": {},
+                "source_url": links[i-1] if i <= len(links) else "unknown",
+                "summary": f"Exception occurred during processing: {str(result)}"
+            })
+        else:
+            processed_results.append(result)
+            if result.get("extracted_data"):
+                successful_results += 1
+    
+    print(f"🏁 Parallel processing completed: {successful_results}/{total_links} links successful")
+    
+    if update_progress_callback:
+        update_progress_callback("searching", f"✅ Parallel search completed: {successful_results}/{total_links} successful")
+    
+    return processed_results
 
 # ─── Multi-page Web Scraping Functions ────────────────────────────────────────
 
@@ -432,14 +468,8 @@ async def scrape_data_bs(url: str, question: str, update_progress_callback=None)
         print(f"❌ Request failed: {e}. Trying with Selenium...")
         try:
             from selenium import webdriver
-            from selenium.webdriver.chrome.options import Options
             
-            chrome_options = Options()
-            chrome_options.add_argument("--headless")
-            chrome_options.add_argument("--no-sandbox")
-            chrome_options.add_argument("--disable-dev-shm-usage")
-            
-            driver = webdriver.Chrome(options=chrome_options)
+            driver = webdriver.Chrome()
             driver.get(url)
             html = driver.page_source
             driver.quit()
