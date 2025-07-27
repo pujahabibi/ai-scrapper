@@ -157,7 +157,7 @@ def scrape_data_bs(url: str, question: str) -> ScrapeResult:
             {"role": "user", "content": user_prompt}
         ],
         temperature=0.2,
-        max_tokens=10000,
+        max_tokens=20000,
     )
     
     # Parse the response - prioritize simple JSON parsing
@@ -275,7 +275,7 @@ def combine_results(scrape_results: List[ScrapeResult]) -> ScrapeResult:
             {"role": "user", "content": user_prompt}
         ],
         temperature=0.1,
-        max_tokens=26000,
+        max_tokens=36000,
     )
 
     try:
