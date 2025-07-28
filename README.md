@@ -22,6 +22,8 @@ cp .env.example .env
 # Edit .env file and add your OpenAI API key
 # Replace 'your-openai-api-key-here' with your actual API key
 ```
+- Edit .env file and add your OpenAI API key
+- Replace 'your-openai-api-key-here' with your actual API key
 
 **2. Run the Application:**
 ```bash
