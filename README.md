@@ -127,9 +127,57 @@ ai-scrapper/
 ├── docker-run.sh      # Docker runner script
 ├── requirements.txt   # Python dependencies
 ├── .env.example       # Environment template
+├── SYSTEM_DESIGN.md   # Architecture documentation
 ├── src/               # React frontend
 └── templates/         # HTML templates
 ```
+
+## 📖 System Design & Architecture
+
+### **📋 Complete Documentation**
+- **[SYSTEM_DESIGN.md](SYSTEM_DESIGN.md)**: Comprehensive technical documentation covering the multi-agent system, detailed workflow, and complete architecture
+
+### **🎯 System Overview**
+
+The AI Scrapper employs a **3-phase intelligent workflow**:
+
+```
+Phase 1: Link Discovery    Phase 2: Parallel Extraction    Phase 3: Result Combination
+┌─────────────────────┐   ┌──────────────────────────┐   ┌─────────────────────────┐
+│ Content Analyzer    │   │ OpenAI Search (Parallel) │   │ JSON Merge & Storage    │
+│ Agent finds relevant│──▶│ Extract data from each   │──▶│ Combine all results     │
+│ detail page links   │   │ link concurrently        │   │ into structured format  │
+└─────────────────────┘   └──────────────────────────┘   └─────────────────────────┘
+```
+
+### **🤖 Multi-Agent Architecture**
+
+**Three Specialized AI Agents:**
+- **🔍 Request Classifier**: Determines scraping vs. Q&A requests
+- **📊 Content Analyzer**: Intelligently discovers relevant links from web pages  
+- **💬 Q&A Assistant**: Handles follow-up questions about scraped data
+
+### **⚡ Key Technical Features**
+
+- **Intelligent Link Selection**: AI analyzes user intent to find only relevant links (job details vs. company pages vs. contact info)
+- **Parallel Processing**: Multiple links scraped simultaneously using `asyncio.gather()`
+- **OpenAI Search Integration**: Advanced AI-powered data extraction from each discovered link
+- **Session Memory**: Conversation history and scraped data preserved for follow-up questions
+- **Robust Fallbacks**: HTTP → Selenium → Manual parsing for maximum reliability
+
+### **🛠️ Technology Stack**
+- **Backend**: FastAPI + OpenAI API + Selenium + WebDriver Manager
+- **Frontend**: React + Webpack
+- **Infrastructure**: Docker + SQLite + Environment-based configuration
+
+### **🔄 Workflow Steps**
+
+1. **Request Classification**: AI determines if user wants scraping or Q&A
+2. **Link Discovery**: Content Analyzer finds all relevant detail page links
+3. **Parallel Extraction**: OpenAI search processes each link concurrently  
+4. **Data Combination**: Results merged into structured JSON format
+5. **Session Storage**: Data saved for follow-up questions and context
+6. **Follow-up Support**: Q&A Assistant answers questions about scraped data
 
 ## ⚙️ Configuration
 
@@ -155,33 +203,6 @@ PYTHONUNBUFFERED=1
 4. Copy the key and paste it in your `.env` file
 
 **💡 Note:** Both `OAI_API_KEY` and `OPENAI_API_KEY` should have the same value for compatibility.
-
-## 🤖 How It Works
-
-1. **Request Classification**: Determines if user wants scraping or Q&A
-2. **Link Discovery**: Finds all relevant detail page links
-3. **Parallel Extraction**: Uses OpenAI search on each link concurrently  
-4. **Data Combination**: Merges results into structured format
-5. **Follow-up Support**: Answers questions about scraped data
-
-## 🔧 Troubleshooting
-
-**Common Issues:**
-
-**❌ "OpenAI API key not found" Error:**
-- Make sure `.env` file exists in the project root
-- Verify both `OAI_API_KEY` and `OPENAI_API_KEY` are set in `.env`
-- Check that there are no extra spaces around the `=` sign
-- Ensure your API key starts with `sk-proj-` or `sk-`
-
-**❌ "401 Unauthorized" Error:**
-- Your API key may be invalid or expired
-- Generate a new API key at [OpenAI Platform](https://platform.openai.com/api-keys)
-- Make sure you have sufficient credits in your OpenAI account
-
-**❌ Application won't start:**
-- Run `python -c "from dotenv import load_dotenv; import os; load_dotenv(); print('API Key found:', bool(os.getenv('OAI_API_KEY')))"` to test
-- Check that all dependencies are installed: `pip install -r requirements.txt`
 
 ## 📝 License
 
