@@ -139,24 +139,65 @@ async def get_scraped_data_context(session: SQLiteSession) -> str:
                     
                     # Parse the JSON to extract job information
                     import json
-                    job_data = json.loads(json_text)
+                    scraped_results = json.loads(json_text)
                     
-                    if not job_data:
+                    if not scraped_results:
                         continue
                         
-                    print(f"✅ Successfully parsed {len(job_data)} jobs from JSON data")
+                    print(f"✅ Successfully parsed {len(scraped_results)} result items from JSON data")
+                    
+                    # Extract all jobs from the new structured format
+                    all_jobs = []
+                    
+                    for result_item in scraped_results:
+                        if not isinstance(result_item, dict):
+                            continue
+                            
+                        extracted_data = result_item.get('extracted_data', {})
+                        
+                        # Handle different formats in extracted_data
+                        if isinstance(extracted_data, dict):
+                            # Case 1: extracted_data contains a 'jobs' array
+                            if 'jobs' in extracted_data and isinstance(extracted_data['jobs'], list):
+                                all_jobs.extend(extracted_data['jobs'])
+                            # Case 2: extracted_data is a direct job object  
+                            elif 'title' in extracted_data or 'role' in extracted_data:
+                                all_jobs.append(extracted_data)
+                            # Case 3: extracted_data contains job fields directly
+                            elif any(key in extracted_data for key in ['title', 'role', 'position', 'job', 'salary', 'location']):
+                                all_jobs.append(extracted_data)
+                        # Case 4: extracted_data is a list of jobs
+                        elif isinstance(extracted_data, list):
+                            all_jobs.extend(extracted_data)
+                    
+                    if not all_jobs:
+                        print("⚠️ No job data found in extracted results")
+                        continue
+                        
+                    print(f"✅ Extracted {len(all_jobs)} individual jobs for context")
                     
                     # Create structured context with full job data for salary analysis
                     context = "PREVIOUS SCRAPED JOB DATA:\n\n"
-                    context += f"Found {len(job_data)} job listings with the following details:\n\n"
+                    context += f"Found {len(all_jobs)} job listings with the following details:\n\n"
                     
-                    for i, job in enumerate(job_data, 1):
-                        context += f"{i}. {job.get('title', 'Unknown Position')}\n"
-                        context += f"   Location: {job.get('location', 'Unknown')}\n"
-                        context += f"   Salary: {job.get('payRate', 'Not specified')}\n"
-                        context += f"   Type: {job.get('workType', 'Unknown')}\n"
-                        if job.get('jobNumber'):
-                            context += f"   Job ID: {job.get('jobNumber')}\n"
+                    for i, job in enumerate(all_jobs, 1):
+                        # Handle different possible field names
+                        title = job.get('title') or job.get('role') or job.get('position') or 'Unknown Position'
+                        location = job.get('location') or job.get('place') or 'Unknown Location'
+                        salary = job.get('salary') or job.get('payRate') or job.get('pay') or job.get('wage') or 'Not specified'
+                        company = job.get('company') or job.get('employer') or job.get('organization') or 'Unknown Company'
+                        job_id = job.get('jobId') or job.get('jobNumber') or job.get('id') or ''
+                        work_type = job.get('workType') or job.get('type') or job.get('employment_type') or ''
+                        
+                        context += f"{i}. {title}\n"
+                        context += f"   Location: {location}\n"
+                        context += f"   Salary: {salary}\n"
+                        if company != 'Unknown Company':
+                            context += f"   Company: {company}\n"
+                        if work_type:
+                            context += f"   Type: {work_type}\n"
+                        if job_id:
+                            context += f"   Job ID: {job_id}\n"
                         context += "\n"
                     
                     return context
@@ -304,41 +345,48 @@ async def search_single_link_with_openai(link: str, user_question: str, index: i
     try:
         print(f"🔍 Searching link {index}/{total_links}: {link}")
         
-        # Create a focused search prompt that only extracts user-requested information
-        search_prompt = f"""Extract ONLY the specific information requested by the user from this link: {link}
+        # Create a focused search prompt that extracts REAL data from the website
+        search_prompt = f"""CRITICAL: You must extract REAL, ACTUAL data from this specific website: {link}
 
 USER REQUEST: {user_question}
 
-EXTRACTION RULES:
-1. ONLY extract information that directly relates to the user's specific request
-2. DO NOT extract general website information unless specifically requested
-3. Focus on the exact data type the user is asking for
-4. If the page doesn't contain the requested information, return empty data
+STRICT EXTRACTION REQUIREMENTS:
+1. ACCESS THE ACTUAL WEBSITE CONTENT at {link}
+2. Extract REAL data - NO dummy examples, NO placeholders, NO generic samples
+3. Use the EXACT text, numbers, and details found on the actual webpage
+4. If you cannot access real data from the site, return empty extracted_data object
+5. DO NOT generate example data like "Job Role 1", "Pay details 1", "Location 1"
+
+REAL DATA EXTRACTION RULES:
+- Extract ACTUAL job titles, company names, salary figures, locations from the webpage
+- Use REAL contact information (emails, phone numbers, addresses) if present
+- Copy EXACT product names, prices, descriptions from the site
+- Preserve ACTUAL dates, reference numbers, and specific details
+- Use the PRECISE wording and formatting from the original webpage
 
 RESPONSE FORMAT:
 Return your response as a valid JSON object with this exact structure:
 {{
     "extracted_data": {{
-        // Only include fields that match the user's request
-        // Use appropriate field names based on what the user is asking for
-        // Example for job request: "title", "location", "salary", "company"
-        // Example for contact request: "name", "email", "phone", "address"
-        // Example for product request: "name", "price", "description", "specifications"
+        // REAL data fields with ACTUAL values from the website
+        // For jobs: actual "title", "location", "salary", "company", "jobId"
+        // For contacts: actual "name", "email", "phone", "address"  
+        // For products: actual "name", "price", "description", "sku"
     }},
     "source_url": "{link}",
-    "summary": "Brief description of what specific information was found (or not found) related to the user's request"
+    "summary": "Brief description of the REAL information found on this specific webpage"
 }}
 
-IMPORTANT: 
-- Only extract data that the user specifically requested
-- Use field names that match the type of information being requested
-- If no relevant information is found, return empty extracted_data object
-- Be precise and focused on the user's actual request"""
+CRITICAL WARNINGS:
+- DO NOT use placeholder text like "Job Role 1", "Details 1", "Location A"
+- DO NOT generate sample data - only extract what actually exists on the page
+- If the page is inaccessible or contains no relevant data, return empty extracted_data
+- The user wants REAL scraped data, not examples or templates"""
         
         # Use OpenAI search API with structured output requirement
         completion = client.chat.completions.create(
             model="gpt-4o-mini-search-preview",
-            web_search_options={"search_context_size": "low"},
+            web_search_options={"search_context_size": "high"},
             messages=[
                 {
                     "role": "user",
@@ -758,9 +806,26 @@ async def combine_results(scrape_results: List[ScrapeResult]) -> ScrapeResult:
     """
     Takes multiple ScrapeResult objects and combines them into one ScrapeResult.
     """
-    print("Combining results...")
+    print(f"🔄 Combining results from {len(scrape_results)} pages...")
     
-    # Use the content analyzer to combine results
+    # Debug: Show what data we're starting with
+    for i, sr in enumerate(scrape_results, 1):
+        print(f"📄 Page {i} summary: {sr.text[:100]}...")
+        if sr.results and sr.results != "[]":
+            try:
+                import json
+                parsed = json.loads(sr.results)
+                print(f"📊 Page {i} has {len(parsed)} items")
+                # Show first item as sample
+                if parsed and len(parsed) > 0:
+                    first_item = parsed[0]
+                    if isinstance(first_item, dict):
+                        sample_data = first_item.get("extracted_data", first_item)
+                        print(f"📋 Page {i} sample: {str(sample_data)[:200]}...")
+            except:
+                print(f"⚠️ Page {i} results parsing failed")
+    
+    # Directly combine the results without using content analyzer (which might be generating dummy data)
     combined_text_parts = []
     combined_results_parts = []
     
@@ -771,53 +836,23 @@ async def combine_results(scrape_results: List[ScrapeResult]) -> ScrapeResult:
                 import json
                 parsed_results = json.loads(sr.results)
                 if isinstance(parsed_results, list):
-                    # Handle the new structured format
-                    for result in parsed_results:
-                        if isinstance(result, dict) and result.get("extracted_data"):
-                            combined_results_parts.append(result)
-                        elif isinstance(result, dict):
-                            # Legacy format support
-                            combined_results_parts.append(result)
+                    # Add all results directly - don't process through content analyzer
+                    combined_results_parts.extend(parsed_results)
                 else:
                     combined_results_parts.append(parsed_results)
-            except json.JSONDecodeError:
+            except json.JSONDecodeError as e:
+                print(f"❌ JSON parsing error in combine_results: {e}")
                 # If parsing fails, treat as raw text
                 combined_results_parts.append({"extracted_data": {"content": sr.results}, "source_url": "unknown", "summary": "Raw data from parsing error"})
     
-    combination_prompt = f"""
-    Please combine and consolidate the following scraped data from multiple pages:
+    print(f"🎯 Direct combination completed: {len(combined_results_parts)} total items")
     
-    Text summaries from each page:
-    {chr(10).join([f"Page {i+1}: {text}" for i, text in enumerate(combined_text_parts)])}
-    
-    Combined results from all pages:
-    Total items to merge: {len(combined_results_parts)}
-    
-    Please create a comprehensive combined summary and return all the merged data in the "results" field as a JSON array.
-    Each item should be a separate object in the results array.
-    """
-    
-    # Create a simple session for the combination
-    temp_session = SQLiteSession("combine_session", "combine_temp.db")
-    
-    # Run the content analyzer to combine results
-    combine_result = await Runner.run(
-        content_analyzer_agent,
-        combination_prompt,
-        session=temp_session
+    # Return combined results directly without using content analyzer agent
+    import json
+    return ScrapeResult(
+        text=f"Combined {len(combined_results_parts)} items from {len(scrape_results)} pages",
+        results=json.dumps(combined_results_parts)
     )
-    
-    try:
-        combined_data = combine_result.final_output_as(ScrapeResult)
-        return combined_data
-    except Exception as e:
-        print(f"❌ Agent combination failed: {e}")
-        # Return combined results directly if agent fails
-        import json
-        return ScrapeResult(
-            text=f"Combined {len(combined_results_parts)} items from {len(scrape_results)} pages",
-            results=json.dumps(combined_results_parts)
-        )
 
 # Main workflow orchestrator with session support and progress tracking
 async def process_user_request(user_input: str, session: SQLiteSession):
