@@ -21,7 +21,7 @@ load_dotenv()
 # Initialize OpenAI client
 openai_api_key = os.getenv("OAI_API_KEY") or os.getenv("OPENAI_API_KEY")
 if not openai_api_key:
-    raise ValueError("❌ OpenAI API key not found! Please set OAI_API_KEY or OPENAI_API_KEY environment variable")
+    raise ValueError("❌ OpenAI API key not found! Please set OAI_API_KEY environment variable")
 
 client = OpenAI(api_key=openai_api_key)
 print("✅ OpenAI client initialized successfully")
@@ -267,58 +267,102 @@ regular_qa_agent = Agent(
 # Agent 3: Content Analyzer Agent - Collects relevant links for detailed extraction
 content_analyzer_agent = Agent(
     name="Content Analyzer",
-    instructions="""You are a highly skilled content analyzer specializing in LINK COLLECTION from websites.
+    instructions="""You are a highly skilled content analyzer specializing in INTELLIGENT LINK COLLECTION from websites.
 
-CRITICAL REQUIREMENTS FOR COMPREHENSIVE LINK COLLECTION:
-1. FIND ALL RELEVANT LINKS - You must find ALL links that might contain the requested information
-2. SCAN THE ENTIRE CONTENT - Read through ALL content, not just the beginning
-3. MULTIPLE PASSES - Look for links in different HTML structures, classes, and sections
-4. NO SHORTCUTS - Do not stop until you've found every possible relevant link
-5. VERIFY COMPLETENESS - Double-check that you haven't missed any links
+CRITICAL REQUIREMENTS FOR INTELLIGENT LINK COLLECTION:
+1. ANALYZE USER INTENT - Understand exactly what type of information the user is requesting
+2. SELECTIVE LINK COLLECTION - Only collect links that contain the MOST RELEVANT information for the user's specific request
+3. AVOID IRRELEVANT LINKS - Do not collect links that don't match the user's intent
+4. QUALITY OVER QUANTITY - Better to have fewer highly relevant links than many irrelevant ones
+5. CONTEXT-AWARE FILTERING - Consider the user's question context when selecting links
 
-ANALYSIS TASK:
-1. Examine the provided HTML content THOROUGHLY
-2. Identify ALL links that might contain the specific information requested by the user
-3. Focus on finding detail pages, profile pages, individual item pages, contact pages
-4. DO NOT attempt direct data extraction - focus only on link collection
+INTELLIGENT ANALYSIS PROCESS:
+1. FIRST: Analyze the user's request to understand their intent:
+   - What specific type of information are they seeking?
+   - What type of links would contain that information?
+   - What type of links should be AVOIDED?
+
+2. SECOND: Examine the HTML content with the user's intent in mind
+3. THIRD: Collect ONLY the links that are most relevant to their specific request
+
+LINK RELEVANCE MATCHING:
+Based on the user's request, collect links that match their intent:
+
+FOR JOB-RELATED REQUESTS:
+- If user asks for job details, salaries, positions, roles → Collect job detail page links
+- If user asks for company info, employers, organizations → Collect company/employer profile links
+- If user asks for contact info → Collect contact/about page links
+
+FOR MEDICAL/HEALTHCARE REQUESTS:
+- If user asks for doctor details, specialties, credentials → Collect doctor profile links
+- If user asks for hospital/clinic info → Collect facility information links
+- If user asks for services/treatments → Collect service detail links
+
+FOR DIRECTORY/LISTING REQUESTS:
+- If user asks for member details → Collect individual member profile links
+- If user asks for organization info → Collect organization detail links
+
+CRITICAL FILTERING RULES:
+- If user asks for JOB DETAILS: Do NOT collect doctor profiles, company general pages, or unrelated content
+- If user asks for DOCTOR INFO: Do NOT collect job listings, employment pages, or unrelated content  
+- If user asks for COMPANY INFO: Do NOT collect individual job postings or employee profiles
+- Always match the link type to the user's specific information need
 
 LINK COLLECTION CRITERIA:
-Look for links that lead to:
-- Individual item details (job details, product details, member profiles)
-- Contact pages or about pages
-- Detail pages with more comprehensive information
-- Official websites or external links
-- Pages that would contain the specific data the user is requesting
+Only collect links that lead to:
+- Pages containing the EXACT type of information the user requested
+- Detail pages that match the user's intent (job details, doctor profiles, company info, etc.)
+- Pages that would directly answer the user's specific question
+- Official sources relevant to the user's request type
 
-WHEN COLLECTING LINKS:
-- Extract ALL URLs that might contain the requested information
-- Look for links in different sections: main content, sidebars, navigation, cards, lists, tables
-- Include links with relevant anchor text or context
-- Include both internal and external links that seem relevant
-- Focus on links that would lead to pages with detailed information
-- For clubs or items WITHOUT websites, include "-" as the link to maintain count
-- Format all found links as a JSON string array in the "results" field
+INTELLIGENT LINK COLLECTION PROCESS:
+1. ANALYZE USER REQUEST: Read the user's question carefully to understand their specific intent
+   - What exact information do they want? (job details, doctor info, company data, etc.)
+   - What would be the best source for this information?
 
-DATA IDENTIFICATION PATTERNS FOR LINK COLLECTION:
-- Links within repeating patterns (job cards, member listings, product grids)
-- "Read more", "View details", "Learn more", "See Details", "Apply" type links
-- Profile links, detail page links, contact page links
-- Official website links, external reference links
-- Links with relevant anchor text matching the user's request
-- JOB SPECIFIC: Individual job listing links (usually containing job IDs or titles)
-- JOB SPECIFIC: Links that lead to individual job detail pages (not the main list page)
+2. FILTER RELEVANT LINK TYPES: Based on user intent, look for:
+   - Links with anchor text matching the user's request
+   - Links leading to pages that would contain the requested information type
+   - Detail pages, profile pages, or information pages relevant to the user's question
 
-EXTRACTION STRATEGY FOR LINKS:
-1. First, identify the main content area and repeating patterns
-2. Scan for obvious link containers/cards/list items
-3. Look for "detail" or "more info" type links within each item
-4. Check navigation and sidebar areas for relevant category links
-5. Look for external/official website links
-6. Extract ALL relevant URLs found
+3. AVOID IRRELEVANT LINKS: Skip links that:
+   - Don't match the user's specific request type
+   - Lead to general pages when user wants specific details
+   - Lead to different information types than requested
 
-IMPORTANT: Your goal is to collect ALL potentially relevant links that could contain the information the user is requesting. Do not attempt to extract data directly - focus only on finding the right links to search.
+CONTEXT-AWARE LINK PATTERNS:
 
-Return a summary of how many links were found and what types of pages they lead to, and format all collected links as a JSON string array in the "results" field.""",
+FOR JOB DETAIL REQUESTS:
+- Individual job posting links (containing job IDs, titles, or "apply" links)
+- Job detail pages with salary, requirements, and descriptions
+- Links like "/jobs/[id]", "/position/[title]", "/apply/[job]"
+
+FOR COMPANY/EMPLOYER REQUESTS:  
+- Company profile pages, about pages, company directories
+- Employer information pages, organization details
+- Links like "/company/[name]", "/about", "/organization/[id]"
+
+FOR PROFESSIONAL DIRECTORY REQUESTS (doctors, lawyers, etc.):
+- Individual professional profile pages
+- Specialty/service detail pages for professionals
+- Links like "/doctor/[name]", "/physician/[id]", "/profile/[professional]"
+
+INTELLIGENT EXTRACTION STRATEGY:
+1. READ USER QUESTION to determine their exact information need
+2. IDENTIFY PAGE TYPE that would contain this information
+3. SCAN HTML for links leading to those specific page types
+4. COLLECT only links that match the user's intent
+5. IGNORE links that don't serve the user's specific purpose
+
+QUALITY CONTROL:
+- If user asks for job details, don't collect company general pages
+- If user asks for doctor info, don't collect job listings  
+- If user asks for contact info, focus on contact/about pages only
+- For items without relevant links, include "-" to maintain count
+
+IMPORTANT: Your goal is to be SELECTIVE and collect only the MOST RELEVANT links that directly serve the user's specific information request. Quality and relevance matter more than quantity.
+
+Return a summary explaining what type of links were collected and why they match the user's request, with all selected links formatted as a JSON string array in the "results" field.""",
     output_type=ScrapeResult,
     model="gpt-4.1-mini",
     model_settings=ModelSettings(
@@ -516,12 +560,70 @@ async def scrape_data_bs(url: str, question: str, update_progress_callback=None)
         print(f"❌ Request failed: {e}. Trying with Selenium...")
         try:
             from selenium import webdriver
+            from selenium.webdriver.chrome.options import Options
+            from webdriver_manager.chrome import ChromeDriverManager
+            from selenium.webdriver.chrome.service import Service
             
-            driver = webdriver.Chrome()
-            driver.get(url)
-            html = driver.page_source
-            driver.quit()
-            print(f"✅ Successfully fetched with Selenium (length: {len(html)})")
+            print("🔧 Setting up Chrome with WebDriver Manager for automatic version matching...")
+            
+            # Configure Chrome options with robust compatibility settings
+            chrome_options = Options()
+            
+            # Essential options for server/Docker environment
+            chrome_options.add_argument("--headless")  # Required for server environments
+            chrome_options.add_argument("--no-sandbox")
+            chrome_options.add_argument("--disable-dev-shm-usage")
+            chrome_options.add_argument("--disable-gpu")
+            chrome_options.add_argument("--disable-software-rasterizer")
+            
+            # Window and display options
+            chrome_options.add_argument("--window-size=1920,1080")
+            chrome_options.add_argument("--start-maximized")
+            
+            # Stability and compatibility options
+            chrome_options.add_argument("--disable-blink-features=AutomationControlled")
+            chrome_options.add_argument("--disable-extensions")
+            chrome_options.add_argument("--disable-plugins")
+            chrome_options.add_argument("--disable-web-security")
+            chrome_options.add_argument("--disable-features=VizDisplayCompositor")
+            chrome_options.add_argument("--disable-dev-tools")
+            chrome_options.add_argument("--no-first-run")
+            chrome_options.add_argument("--no-default-browser-check")
+            chrome_options.add_argument("--ignore-certificate-errors")
+            chrome_options.add_argument("--ignore-ssl-errors")
+            
+            # User agent to avoid blocking
+            chrome_options.add_argument("--user-agent=Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36")
+            
+            # Try to initialize Chrome with WebDriver Manager for automatic version matching
+            driver = None
+            try:
+                # WebDriver Manager automatically downloads and manages the correct ChromeDriver version
+                service = Service(ChromeDriverManager().install())
+                driver = webdriver.Chrome(service=service, options=chrome_options)
+                print("✅ Chrome initialized with WebDriver Manager (automatic version matching)")
+            except Exception as driver_error:
+                print(f"❌ WebDriver Manager failed: {driver_error}")
+                print("🔄 Trying fallback with system ChromeDriver...")
+                try:
+                    # Fallback to system ChromeDriver with minimal options
+                    minimal_options = Options()
+                    minimal_options.add_argument("--headless")
+                    minimal_options.add_argument("--no-sandbox")
+                    minimal_options.add_argument("--disable-dev-shm-usage")
+                    minimal_options.add_argument("--disable-gpu")
+                    driver = webdriver.Chrome(options=minimal_options)
+                    print("✅ Chrome initialized with system ChromeDriver (fallback)")
+                except Exception as fallback_error:
+                    print(f"❌ System ChromeDriver also failed: {fallback_error}")
+                    raise Exception(f"All ChromeDriver methods failed: {driver_error}, {fallback_error}")
+            if driver:
+                driver.get(url)
+                html = driver.page_source
+                driver.quit()
+                print(f"✅ Successfully fetched with Selenium (length: {len(html)})")
+            else:
+                raise Exception("Failed to initialize Chrome driver")
         except Exception as selenium_error:
             print(f"❌ Selenium also failed: {selenium_error}")
             return ScrapeResult(
@@ -544,68 +646,60 @@ async def scrape_data_bs(url: str, question: str, update_progress_callback=None)
     Website URL: {url}
     Website Content: {html}
     
-    COMPREHENSIVE LINK COLLECTION ANALYSIS:
+    INTELLIGENT LINK SELECTION ANALYSIS:
     
-    1. THOROUGH LINK SCAN: Examine EVERY section of this HTML content for relevant links
-    2. COMPLETE LINK COLLECTION: Find ALL links that might contain the information requested by the user
-    3. LINK IDENTIFICATION: Look in all areas - main content, sidebars, headers, footers, nested sections, cards, lists, tables
-    4. STRUCTURED OUTPUT: Format all collected links as a JSON string array
+    STEP 1 - ANALYZE USER INTENT:
+    First, analyze what the user is specifically asking for in their request: "{question}"
     
-    SPECIFIC INSTRUCTIONS FOR "{question}":
+    Determine:
+    - What TYPE of information do they want? (job details, doctor profiles, company info, contact details, etc.)
+    - What KIND of links would contain this specific information?
+    - What links should be AVOIDED because they don't match the user's intent?
     
-    PHASE 1 - LINK IDENTIFICATION:
-    - Scan the ENTIRE HTML content thoroughly for relevant links
-    - Look for ALL links that might lead to detailed information about the user's request
-    - Check main content areas, navigation, sidebars, footers, and nested sections
-    - Find EVERY link that could contain the requested data
+    STEP 2 - INTELLIGENT LINK FILTERING:
+    Based on the user's intent, apply these selection rules:
     
-    PHASE 2 - LINK COLLECTION:
-    - Collect ALL links that lead to detail pages, profile pages, contact pages
-    - Include links within repeating patterns (job cards, member listings, product cards)
-    - Focus on "Read more", "View details", "Contact", "About" type links
-    - Include official website links and external reference links
-    - For clubs/items that exist but have no website link, include "-" in the array
-    - Format all collected links as a JSON string array in the "results" field
-    - Each link should be a separate URL string or "-" in the array
+    IF USER ASKS FOR JOB DETAILS/POSITIONS/SALARIES/ROLES:
+    - COLLECT: Individual job posting links, job detail pages, position-specific URLs
+    - COLLECT: Links with job IDs, position titles, salary information, job descriptions
+    - AVOID: Company general pages, employer profiles, contact pages, doctor listings
     
-    LINK COLLECTION REQUIREMENTS:
-    - For job listings: Collect ALL links that lead to individual job detail pages (typically 10-20 per page)
-    - For job listings: Look for links in job titles, "Apply" buttons, "View Details" buttons  
-    - For job listings: DO NOT include the main listing page URL - focus on individual job URLs
-    - For contact information: Collect ALL links that lead to contact pages, about pages, official websites
-    - For member directories: Collect ALL links that lead to individual member profiles or contact pages
-    - For product listings: Collect ALL links that lead to individual product detail pages
-    - For club directories: Collect ALL links to club websites, even if they're external links
-    - For any structured data: Collect EVERY link that might contain detailed information
+    IF USER ASKS FOR COMPANY/EMPLOYER/ORGANIZATION INFO:
+    - COLLECT: Company profile pages, about pages, organization details, employer information
+    - COLLECT: Links to company websites, organizational structure, business information
+    - AVOID: Individual job postings, employee profiles, unrelated listings
     
-    SPECIAL FOCUS FOR CLUB DIRECTORIES:
-- Scan the ENTIRE page for ALL club website links (look for <a href="..."> tags)
-- Include ALL external club website URLs (even if they're not on the same domain)
-- Look for patterns like figcaption links, image links, and text links to club websites
-- For clubs that exist but have NO website link, include "-" to maintain the total count
-- Do NOT limit the number of links - collect ALL clubs (with links or "-" for no link)
+    IF USER ASKS FOR DOCTOR/PHYSICIAN/MEDICAL PROFESSIONAL INFO:
+    - COLLECT: Doctor profile pages, physician directories, medical professional details
+    - COLLECT: Links with specialties, credentials, medical practice information
+    - AVOID: Job listings, company pages, non-medical content
     
-        CRITICAL REQUIREMENTS BASED ON CONTENT TYPE:
+    IF USER ASKS FOR CONTACT INFORMATION:
+    - COLLECT: Contact pages, about pages, directory listings with contact details
+    - COLLECT: Links that lead to phone numbers, emails, addresses
+    - AVOID: Job postings, detailed product pages, unrelated content
     
-    FOR CLUB DIRECTORIES (like Arizona Soccer Association):
-    - This page should contain approximately 73 member clubs
-    - Each club may or may not have a link to their official website
-    - Scan THOROUGHLY for ALL <a href="..."> tags that point to club websites
-    - Look in ALL sections: main content, image captions, club listings, etc.
-    - For clubs WITHOUT website links, include "-" to maintain the count of 73
-    - Do NOT stop at 10 links - find ALL ~73 clubs (with links OR "-" for no link)
+    IF USER ASKS FOR MEMBER/CLUB DIRECTORIES:
+    - COLLECT: Individual member/club profile pages, organization websites
+    - COLLECT: Links to specific clubs, member details, organizational information
+    - Include "-" for members/clubs without website links to maintain count
     
-    FOR JOB LISTINGS (like medrecruit.com):
-    - This page should contain 10-20 individual job listings per page
-    - Each job has a detail link pattern like "/jobs/[grade]/[specialty]/[job-id]"
-    - Look for <a> tags with href containing "/jobs/" or class names like "JobCard_title"
-    - DO NOT include the main listing page URL - only individual job detail URLs
-    - Scan for job cards, articles with data-testid="job-card", or similar containers
-    - Each job listing should have its own detail page link
+    STEP 3 - SELECTIVE LINK COLLECTION:
+    Only collect links that DIRECTLY serve the user's specific information need:
+    - Scan HTML content for links matching the identified intent
+    - Focus on links with relevant anchor text, URLs, or context
+    - Prioritize links that would contain the exact information requested
+    - Skip links that don't match the user's specific request type
     
-    IMPORTANT: Your goal is to find ALL potentially relevant links for the content type (expected ~73 for club directories, ~10-20 for job listings). Do not attempt direct data extraction - focus only on collecting links that can be searched later using OpenAI search API.
+    QUALITY CONTROL:
+    - If user wants job details, don't collect general company pages
+    - If user wants company info, don't collect individual job postings  
+    - If user wants doctor info, don't collect job or company listings
+    - Always match link selection to user's SPECIFIC information need
     
-    Return a summary of how many links were collected and what types of pages they lead to, with all links formatted as a JSON string array in the "results" field.
+    IMPORTANT: Be SELECTIVE and intelligent. Collect only the MOST RELEVANT links that directly answer the user's specific question. Quality and relevance are more important than quantity.
+    
+    Return a summary explaining what type of links were selected based on the user's intent, and format the selected links as a JSON string array in the "results" field.
     """
     
     # Create a session for the analysis

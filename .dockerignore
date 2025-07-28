@@ -1,0 +1,54 @@
+# Git files
+.git
+.gitignore
+
+# Node modules (will be installed in Docker)
+node_modules/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+
+# Environment files
+.env
+.env.example
+.env.local
+.env.development
+.env.production
+
+# Logs
+*.log
+logs/
+
+# Database files
+*.db
+*.sqlite
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Build artifacts
+build/
+dist/
+
+# Development files
+dev.sh
+*.md
+
+# Test files
+test_*.py
+
+# Temporary files
+*.tmp
+*.temp 

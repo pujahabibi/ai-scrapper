@@ -1,149 +1,126 @@
-# 🤖 AI Scrapper - Multi-Agent Chat
+# AI Scrapper - Multi-Agent Web Scraping Chat
 
-A beautiful, modern web interface for AI-powered conversations and web scraping using React and Bootstrap.
+An intelligent web scraping application powered by OpenAI agents that can extract structured data from websites and answer follow-up questions about the scraped data.
 
-## ✨ Features
+## 🚀 Quick Start with Docker
 
-- **🎨 Modern UI**: Beautiful React interface with Bootstrap 5 and glassmorphism effects
-- **🤖 Multi-Agent System**: Intelligent AI agents for different tasks
-- **🕷️ Web Scraping**: Smart web scraping capabilities with progress tracking
-- **💬 Interactive Chat**: Real-time chat interface with typing indicators
-- **🧠 Context Memory**: Remembers conversation context across sessions
-- **📱 Responsive Design**: Works perfectly on desktop and mobile devices
-- **⚡ Real-time Progress**: Live progress tracking for long-running tasks
-
-## 🚀 Quick Start
-
-### Prerequisites
-
-- Python 3.8+ with conda environment named 'work'
-- Node.js 16+ and npm
-
-### Installation
-
-1. **Clone and setup:**
+**Single command setup:**
 ```bash
-git clone <your-repo>
+./docker-run.sh
+```
+
+**Prerequisites:**
+- Docker installed and running
+- OpenAI API key
+
+The script will:
+1. Copy `.env.example` to `.env` (add your OpenAI API key)
+2. Build the Docker image
+3. Start the application on `http://localhost:8000`
+
+## 🔧 Manual Setup
+
+**1. Clone and setup:**
+```bash
+git clone <repository-url>
 cd ai-scrapper
 ```
 
-2. **Install dependencies:**
+**2. Install dependencies:**
 ```bash
-# Activate conda environment
-conda activate work
+# Python dependencies
+pip install -r requirements.txt
 
-# Install Python dependencies (if not already installed)
-# pip install fastapi uvicorn ...
-
-# Install Node.js dependencies  
+# Frontend dependencies  
 npm install
+npm run build
 ```
 
-3. **Build and run:**
+**3. Environment setup:**
 ```bash
-# Build the React application
-npm run build
+# Copy example file and edit with your API key
+cp .env.example .env
+# Edit .env file with your actual OpenAI API key
+```
 
-# Start the server
+**4. Run application:**
+```bash
 python run_server.py
 ```
 
-Or use the development script:
-```bash
-# Build and start in one command
-./dev.sh dev
+## 📋 Features
+
+- **Smart Web Scraping**: Multi-page scraping with link discovery
+- **AI-Powered Extraction**: Uses OpenAI search for precise data extraction
+- **Follow-up Questions**: Ask questions about previously scraped data
+- **Parallel Processing**: Fast concurrent link processing
+- **Session Memory**: Remembers conversation history
+- **Modern UI**: React-based chat interface
+
+## 🔍 Usage Examples
+
+**Scraping:**
+```
+https://example.com/jobs Get all job titles, locations and salaries from page 1 to 3
 ```
 
-### 🌐 Access the Application
+**Follow-up Questions:**
+```
+Which jobs pay more than $50,000?
+How many jobs were found in total?
+List all jobs in New York
+```
 
-Open your browser and go to: **http://localhost:8000**
+## 🐳 Docker Commands
 
-## 🛠️ Development
+```bash
+# Run application
+./docker-run.sh
 
-### Project Structure
+# View logs
+./docker-run.sh logs
+
+# Stop application  
+./docker-run.sh stop
+
+# Restart application
+./docker-run.sh restart
+
+# Rebuild image only
+./docker-run.sh build
+```
+
+## 📁 Project Structure
 
 ```
 ai-scrapper/
-├── src/                     # React source code
-│   ├── components/          # React components
-│   │   ├── ChatInterface.js # Main chat interface
-│   │   ├── Message.js       # Individual message bubbles
-│   │   ├── InputForm.js     # Message input form
-│   │   ├── ProgressIndicator.js # Progress tracking
-│   │   └── ...
-│   ├── styles/              # CSS styles
-│   └── App.js              # Main React app
-├── static/                  # Generated static files
-├── templates/               # HTML templates  
-├── api.py                   # FastAPI backend
-├── main_agents.py           # AI agent logic
-└── run_server.py           # Server launcher
+├── main_agents.py      # Core multi-agent logic
+├── api.py             # FastAPI server
+├── run_server.py      # Application launcher
+├── Dockerfile         # Docker configuration
+├── docker-run.sh      # Docker runner script
+├── requirements.txt   # Python dependencies
+├── .env.example       # Environment template
+├── src/               # React frontend
+└── templates/         # HTML templates
 ```
 
-### Development Commands
+## ⚙️ Configuration
 
+Environment variables in `.env`:
 ```bash
-# Build React app
-npm run build
-
-# Start development mode (build + start)
-./dev.sh dev
-
-# Just start server
-./dev.sh start
-
-# Build only
-./dev.sh build
+OAI_API_KEY=your-openai-api-key-here
+OPENAI_API_KEY=your-openai-api-key-here  # Same value (OpenAI library compatibility)
 ```
 
-### 🎨 UI Components
+## 🤖 How It Works
 
-- **Glassmorphism Design**: Modern glass-like effects with backdrop blur
-- **Bootstrap 5**: Full responsive grid system and components
-- **FontAwesome Icons**: Beautiful icons throughout the interface
-- **Custom Animations**: Smooth slide-in animations for messages
-- **Progress Tracking**: Real-time progress bars with step indicators
-- **Interactive Elements**: Hover effects and smooth transitions
+1. **Request Classification**: Determines if user wants scraping or Q&A
+2. **Link Discovery**: Finds all relevant detail page links
+3. **Parallel Extraction**: Uses OpenAI search on each link concurrently  
+4. **Data Combination**: Merges results into structured format
+5. **Follow-up Support**: Answers questions about scraped data
 
-## 🌟 Features in Detail
+## 📝 License
 
-### 💬 Chat Interface
-- Beautiful message bubbles with speech tails
-- User and AI avatars
-- Message type indicators (Web Scraping, AI Response, etc.)
-- Timestamps and animation effects
-- Auto-scroll to latest messages
-
-### 📊 Progress Tracking  
-- Real-time progress bars
-- Step-by-step indicators
-- Colored badges for different operation types
-- Smooth animations and transitions
-
-### 🔧 Session Management
-- Persistent session storage
-- Clear conversation functionality
-- Session ID display
-- Local storage integration
-
-### 📱 Responsive Design
-- Mobile-first approach
-- Bootstrap responsive grid
-- Touch-friendly interface
-- Optimized for all screen sizes
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Build and test: `npm run build`
-5. Submit a pull request
-
-## 📄 License
-
-This project is licensed under the MIT License.
-
----
-
-**🎉 Enjoy your beautiful, modern AI Scrapper interface!** 
+MIT License - see LICENSE file for details. 

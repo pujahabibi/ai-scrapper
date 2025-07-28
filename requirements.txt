@@ -1,0 +1,21 @@
+# Core framework dependencies  
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+pydantic>=2.10
+
+# AI and agent dependencies
+openai-agents>=0.2.3
+openai>=1.97.0
+langchain-core>=0.1.0
+
+# Web scraping dependencies
+requests>=2.31.0
+beautifulsoup4>=4.12.0
+selenium>=4.15.0
+webdriver-manager>=4.0.0
+
+# Environment and utilities
+python-dotenv>=1.0.0
+
+# CORS middleware
+python-multipart>=0.0.6 
